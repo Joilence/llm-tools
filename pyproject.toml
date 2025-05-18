@@ -1,0 +1,43 @@
+[project]
+name = "ltls"
+version = "0.1.0"
+description = "ltls (llm-tools)"
+license = { file = "LICENSE" }
+readme = "README.md"
+authors = [{ name = "Jonathan Yang" }]
+keywords = ["mcp", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.12"
+dependencies = ["mcp>=1.8.1", "pip>=25.1.1", "pluggy>=1.5.0"]
+
+[dependency-groups]
+dev = ["pre-commit", "ty", "pytest", "ruff", "mcp[cli]>=1.8.1"]
+
+[project.scripts]
+ltls = "ltls.cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+
+[project.urls]
+Homepage = "https://github.com/Joilence/llm-tools"
+Repository = "https://github.com/Joilence/llm-tools"
+"Bug Tracker" = "https://github.com/Joilence/llm-tools/issues"
