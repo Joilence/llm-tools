@@ -49,8 +49,6 @@ class Toolkit(ABC):
 
     @property
     def name(self) -> str:
-        if hasattr(self, "name"):
-            return self.name
         return self.__class__.__name__
 
     @property
@@ -69,12 +67,19 @@ class Toolkit(ABC):
         - are functions
         - are decorated with `tool_def`
         """
-        tool_functions = [
-            getattr(self, attr_name)
-            for attr_name in dir(self)
-            if callable(getattr(self, attr_name))
-            and hasattr(getattr(self, attr_name), "_tool_def")
-        ]
+        tool_functions = []
+        for attr_name in dir(self):
+            # First check if the attribute on the class is a property
+            class_attr = getattr(type(self), attr_name, None)
+            if isinstance(class_attr, property):
+                # Skip properties
+                continue
+                
+            # Then get the instance attribute
+            attr = getattr(self, attr_name)
+            if callable(attr) and hasattr(attr, "_tool_def"):
+                tool_functions.append(attr)
+                
         return [
             cast(
                 Tool,
@@ -105,7 +110,10 @@ class ToolkitSuite(ABC):
 
     @property
     def tool_names(self) -> List[str]:
-        return [tool.name for toolkit in self._toolkits for tool in toolkit.tool_names]
+        result = []
+        for toolkit in self._toolkits:
+            result.extend(toolkit.tool_names)
+        return result
 
     def __init__(self, toolkits: List[Toolkit]):
         self._toolkits = toolkits
