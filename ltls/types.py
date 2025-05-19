@@ -57,7 +57,7 @@ class Toolkit(ABC):
     def tool_names(self) -> List[str]:
         return [tool.name for tool in self.get_tools()]
 
-    def as_params(
+    def as_param(
         self, mode: ToolParamMode = ToolParamMode.OPENAI
     ) -> List[Dict[str, Any]]:
         """Convert the tools in toolkit to a schema that can be used as parameters to pass to, e.g. LLM call"""
@@ -110,13 +110,13 @@ class ToolkitSuite(ABC):
     def __init__(self, toolkits: List[Toolkit]):
         self._toolkits = toolkits
 
-    def as_params(
+    def as_param(
         self, mode: ToolParamMode = ToolParamMode.OPENAI
     ) -> List[Dict[str, Any]]:
         """Convert the tools in toolkits to a schema that can be used as parameters to pass to, e.g. LLM call"""
         params = []
         for toolkit in self._toolkits:
-            params.extend(toolkit.as_params(mode))
+            params.extend(toolkit.as_param(mode))
         return params
 
     def register_mcp(self, mcp: FastMCP):
