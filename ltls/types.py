@@ -46,6 +46,10 @@ class Toolkit(ABC):
             return self.name
         return self.__class__.__name__
 
+    @property
+    def tool_names(self) -> List[str]:
+        return [tool.name for tool in self.get_tools()]
+
     def as_params(
         self, mode: ToolParamMode = ToolParamMode.OPENAI
     ) -> List[Dict[str, Any]]:
@@ -91,6 +95,10 @@ class ToolkitSuite(ABC):
     """A collection of toolkits for different purposes"""
 
     _toolkits: List[Toolkit]
+
+    @property
+    def tool_names(self) -> List[str]:
+        return [tool.name for toolkit in self._toolkits for tool in toolkit.tool_names]
 
     def __init__(self, toolkits: List[Toolkit]):
         self._toolkits = toolkits
