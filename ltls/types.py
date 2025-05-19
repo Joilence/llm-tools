@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ToolParamMode(Enum):
+class ToolParamMode(str, Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     MCP = "mcp"
@@ -32,6 +32,13 @@ class Tool(FastMCPTool):
                         "description": self.description,
                         "parameters": self.parameters,
                     },
+                }
+            case ToolParamMode.ANTHROPIC:
+                # See: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+                return {
+                    "name": self.name,
+                    "description": self.description,
+                    "input_schema": self.parameters,
                 }
             case _:
                 raise NotImplementedError(f"unsupported mode: {mode}")
