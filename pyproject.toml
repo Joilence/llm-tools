@@ -49,6 +49,12 @@ packages = ["."]
 venvPath = "."
 venv = ".venv"
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests that connect to external APIs",
+]
+# Skip integration tests by default
+addopts = "-m 'not integration'"
 
 [project.urls]
 Homepage = "https://github.com/Joilence/llm-tools"

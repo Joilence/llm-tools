@@ -26,9 +26,6 @@ class ToolParamSchema(str, Enum):
     MCP = "mcp"
 
 
-AnthropicToolParam = anthropic.types.ToolParam
-
-
 class OpenAIFunctionDef(TypedDict):
     name: str
     description: str
@@ -51,18 +48,15 @@ class Tool(FastMCPTool):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> anthropic.types.ToolParam:
-        ...
+    ) -> anthropic.types.ToolParam: ...
 
     @overload
-    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam:
-        ...
+    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> UnionToolParam:
-        ...
+    ) -> UnionToolParam: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -105,20 +99,17 @@ class Toolkit(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]:
-        ...
+    ) -> Sequence[anthropic.types.ToolParam]: ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]:
-        ...
+    ) -> Sequence[OpenAIToolParam]: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]:
-        ...
+    ) -> Sequence[UnionToolParam]: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -186,20 +177,17 @@ class ToolkitSuite(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]:
-        ...
+    ) -> Sequence[anthropic.types.ToolParam]: ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]:
-        ...
+    ) -> Sequence[OpenAIToolParam]: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]:
-        ...
+    ) -> Sequence[UnionToolParam]: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
