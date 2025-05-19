@@ -9,4 +9,4 @@ repos:
     rev: v1.1.400
     hooks:
       - id: pyright
-        exclude: "^examples/*"
+        exclude: "^examples/"

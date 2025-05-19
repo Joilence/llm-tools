@@ -5,7 +5,7 @@ description = "ltls (llm-tools)"
 license = { file = "LICENSE" }
 readme = "README.md"
 authors = [{ name = "Jonathan Yang" }]
-keywords = ["mcp", "llm"]
+keywords = ["mcp", "llm", "agent", "agentic"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -17,7 +17,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.12"
-dependencies = ["mcp>=1.8.1", "pip>=25.1.1", "pluggy>=1.5.0"]
+dependencies = [
+    "anthropic>=0.51.0",
+    "mcp>=1.8.1",
+    "pip>=25.1.1",
+    "pluggy>=1.5.0",
+]
 
 [dependency-groups]
 dev = [
