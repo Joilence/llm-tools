@@ -1,45 +1,92 @@
 import json
 from dataclasses import dataclass
-from typing import Callable, List, Dict, Any, cast
+from typing import (
+    Callable,
+    Any,
+    Literal,
+    TypedDict,
+    Union,
+    cast,
+    overload,
+    Sequence,
+)
 from abc import ABC
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
 from mcp.server.fastmcp import FastMCP
 from enum import Enum
 import logging
+import anthropic
 
 logger = logging.getLogger(__name__)
 
 
-class ToolParamMode(str, Enum):
+class ToolParamSchema(str, Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     MCP = "mcp"
+
+
+AnthropicToolParam = anthropic.types.ToolParam
+
+
+class OpenAIFunctionDef(TypedDict):
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+# Define TypedDict for OpenAI's tool format
+class OpenAIToolParam(TypedDict):
+    type: Literal["function"]
+    function: OpenAIFunctionDef
+
+
+UnionToolParam = Union[OpenAIToolParam, anthropic.types.ToolParam]
 
 
 class Tool(FastMCPTool):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def as_param(self, mode: ToolParamMode = ToolParamMode.OPENAI) -> Dict[str, Any]:
+    @overload
+    def as_param(
+        self, mode: Literal[ToolParamSchema.ANTHROPIC]
+    ) -> anthropic.types.ToolParam:
+        ...
+
+    @overload
+    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam:
+        ...
+
+    @overload
+    def as_param(
+        self, mode: ToolParamSchema = ToolParamSchema.OPENAI
+    ) -> UnionToolParam:
+        ...
+
+    def as_param(
+        self, mode: ToolParamSchema = ToolParamSchema.OPENAI
+    ) -> UnionToolParam:
         """Convert the tool to a schema that can be used as parameters to pass to, e.g. LLM call"""
         match mode:
-            case ToolParamMode.OPENAI:
+            case ToolParamSchema.OPENAI:
                 # See: https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools
-                return {
-                    "type": "function",
-                    "function": {
-                        "name": self.name,
-                        "description": self.description,
-                        "parameters": self.parameters,
-                    },
-                }
-            case ToolParamMode.ANTHROPIC:
+                return OpenAIToolParam(
+                    type="function",
+                    function=OpenAIFunctionDef(
+                        name=self.name,
+                        description=self.description,
+                        parameters=self.parameters,
+                    ),
+                )
+            case ToolParamSchema.ANTHROPIC:
                 # See: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
-                return {
-                    "name": self.name,
-                    "description": self.description,
-                    "input_schema": self.parameters,
-                }
+                # Create ToolParam using Anthropic's API directly
+                return anthropic.types.ToolParam(
+                    name=self.name,
+                    description=self.description,
+                    input_schema=self.parameters,
+                )
             case _:
                 raise NotImplementedError(f"unsupported mode: {mode}")
 
@@ -52,12 +99,30 @@ class Toolkit(ABC):
         return self.__class__.__name__
 
     @property
-    def tool_names(self) -> List[str]:
+    def tool_names(self) -> list[str]:
         return [tool.name for tool in self.get_tools()]
 
+    @overload
     def as_param(
-        self, mode: ToolParamMode = ToolParamMode.OPENAI
-    ) -> List[Dict[str, Any]]:
+        self, mode: Literal[ToolParamSchema.ANTHROPIC]
+    ) -> Sequence[anthropic.types.ToolParam]:
+        ...
+
+    @overload
+    def as_param(
+        self, mode: Literal[ToolParamSchema.OPENAI]
+    ) -> Sequence[OpenAIToolParam]:
+        ...
+
+    @overload
+    def as_param(
+        self, mode: ToolParamSchema = ToolParamSchema.OPENAI
+    ) -> Sequence[UnionToolParam]:
+        ...
+
+    def as_param(
+        self, mode: ToolParamSchema = ToolParamSchema.OPENAI
+    ) -> Sequence[UnionToolParam]:
         """Convert the tools in toolkit to a schema that can be used as parameters to pass to, e.g. LLM call"""
         tools = self.get_tools()
         return [tool.as_param(mode) for tool in tools]
@@ -74,12 +139,12 @@ class Toolkit(ABC):
             if isinstance(class_attr, property):
                 # Skip properties
                 continue
-                
+
             # Then get the instance attribute
             attr = getattr(self, attr_name)
             if callable(attr) and hasattr(attr, "_tool_def"):
                 tool_functions.append(attr)
-                
+
         return [
             cast(
                 Tool,
@@ -106,21 +171,39 @@ class Toolkit(ABC):
 class ToolkitSuite(ABC):
     """A collection of toolkits for different purposes"""
 
-    _toolkits: List[Toolkit]
+    _toolkits: list[Toolkit]
 
     @property
-    def tool_names(self) -> List[str]:
+    def tool_names(self) -> list[str]:
         result = []
         for toolkit in self._toolkits:
             result.extend(toolkit.tool_names)
         return result
 
-    def __init__(self, toolkits: List[Toolkit]):
+    def __init__(self, toolkits: list[Toolkit]):
         self._toolkits = toolkits
 
+    @overload
     def as_param(
-        self, mode: ToolParamMode = ToolParamMode.OPENAI
-    ) -> List[Dict[str, Any]]:
+        self, mode: Literal[ToolParamSchema.ANTHROPIC]
+    ) -> Sequence[anthropic.types.ToolParam]:
+        ...
+
+    @overload
+    def as_param(
+        self, mode: Literal[ToolParamSchema.OPENAI]
+    ) -> Sequence[OpenAIToolParam]:
+        ...
+
+    @overload
+    def as_param(
+        self, mode: ToolParamSchema = ToolParamSchema.OPENAI
+    ) -> Sequence[UnionToolParam]:
+        ...
+
+    def as_param(
+        self, mode: ToolParamSchema = ToolParamSchema.OPENAI
+    ) -> Sequence[UnionToolParam]:
         """Convert the tools in toolkits to a schema that can be used as parameters to pass to, e.g. LLM call"""
         params = []
         for toolkit in self._toolkits:
@@ -135,21 +218,21 @@ class ToolkitSuite(ABC):
     def add_toolkit(self, toolkit: Toolkit):
         self._toolkits.append(toolkit)
 
-    def get_toolkits(self) -> List[Toolkit]:
+    def get_toolkits(self) -> list[Toolkit]:
         return self._toolkits
 
-    def get_tools(self) -> List[Tool]:
+    def get_tools(self) -> list[Tool]:
         """Get all tools from all toolkits"""
         return [tool for toolkit in self._toolkits for tool in toolkit.get_tools()]
 
-    async def execute_tool(self, name: str, arguments: Dict[str, Any] | str):
+    async def execute_tool(self, name: str, arguments: dict[str, Any] | str):
         """Execute the tool with the given name and arguments"""
         for tool in self.get_tools():
             if tool.name == name:
                 logger.info(
                     f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
                 )
-                processed_arguments: Dict[str, Any]
+                processed_arguments: dict[str, Any]
                 try:
                     if isinstance(arguments, str):
                         processed_arguments = json.loads(arguments)
