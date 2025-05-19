@@ -20,7 +20,15 @@ requires-python = ">=3.12"
 dependencies = ["mcp>=1.8.1", "pip>=25.1.1", "pluggy>=1.5.0"]
 
 [dependency-groups]
-dev = ["pre-commit", "ty", "pytest", "ruff", "mcp[cli]>=1.8.1"]
+dev = [
+    "pre-commit",
+    "ty",
+    "pytest",
+    "ruff",
+    "mcp[cli]>=1.8.1",
+    "pytest-asyncio>=0.26.0",
+    "anthropic>=0.51.0",
+]
 
 [project.scripts]
 ltls = "ltls.cli:cli"
