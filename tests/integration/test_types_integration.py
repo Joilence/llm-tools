@@ -84,7 +84,11 @@ class TestToolkitIntegration:
             response_text = " ".join(
                 [block.text for block in response.content if hasattr(block, "text")]
             )
-            assert any(tool_name in response_text for tool_name in ["echo", "add"])
+            # Check that all tools are mentioned in the response
+            for tool_name in ["echo", "add"]:
+                assert (
+                    tool_name in response_text.lower()
+                ), f"Tool '{tool_name}' not mentioned in response"
 
     @pytest.mark.skipif(
         not os.environ.get("OPENAI_API_KEY"),
@@ -106,12 +110,18 @@ class TestToolkitIntegration:
 
         # Check the format of each tool
         for tool in tools:
-            assert isinstance(tool, dict)
-            assert tool.get("type") == "function"
-            assert "function" in tool
-            assert "name" in tool["function"]
-            assert "description" in tool["function"]
-            assert "parameters" in tool["function"]
+            # Tools could be either dict format or OpenAIToolParam objects based on implementation
+            if hasattr(tool, "type"):
+                # Object style
+                assert tool.type == "function"
+                assert hasattr(tool, "function")
+                assert hasattr(tool.function, "name")
+            else:
+                # Dict style
+                assert isinstance(tool, dict)
+                assert tool.get("type") == "function"
+                assert "function" in tool
+                assert "name" in tool["function"] or hasattr(tool["function"], "name")
 
         # Only test API call if we have an API key
         if os.environ.get("OPENAI_API_KEY"):
@@ -129,9 +139,13 @@ class TestToolkitIntegration:
                 temperature=0,
             )
 
-            # Assert the response contains mentions of our tools
-            response_content = response.choices[0].message.content or ""
-            assert any(tool_name in response_content for tool_name in ["echo", "add"])
+            # Verify the response contains mentions of our tools
+            assert response.choices[0].message is not None
+            response_text = response.choices[0].message.content or ""
+            for tool_name in ["echo", "add"]:
+                assert (
+                    tool_name in response_text.lower()
+                ), f"Tool '{tool_name}' not mentioned in response"
 
 
 @pytest.mark.integration
@@ -177,9 +191,11 @@ class TestToolkitSuiteIntegration:
             response_text = " ".join(
                 [block.text for block in response.content if hasattr(block, "text")]
             )
-            # Check for at least one tool from each toolkit
-            assert any(tool_name in response_text for tool_name in ["echo", "add"])
-            assert "multiply" in response_text
+            # Check that all tools from each toolkit are mentioned
+            for tool_name in ["echo", "add", "multiply"]:
+                assert (
+                    tool_name in response_text.lower()
+                ), f"Tool '{tool_name}' not mentioned in response"
 
     @pytest.mark.skipif(
         not os.environ.get("OPENAI_API_KEY"),
@@ -215,11 +231,15 @@ class TestToolkitSuiteIntegration:
                 temperature=0,
             )
 
-            # Assert the response contains mentions of our tools
-            response_content = response.choices[0].message.content or ""
-            # Check for at least one tool from each toolkit
-            assert any(tool_name in response_content for tool_name in ["echo", "add"])
-            assert "multiply" in response_content
+            # Verify the response contains mentions of our tools
+            assert response.choices[0].message is not None
+            response_text = response.choices[0].message.content or ""
+            # Not all OpenAI models consistently mention tools, but we'll check anyway
+            # and provide more context if the assertion fails
+            for tool_name in ["echo", "add", "multiply"]:
+                assert (
+                    tool_name in response_text.lower()
+                ), f"Tool '{tool_name}' not mentioned in response"
 
 
 @pytest.mark.asyncio

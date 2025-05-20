@@ -4,7 +4,6 @@ from typing import (
     Callable,
     Any,
     Literal,
-    TypedDict,
     Union,
     cast,
     overload,
@@ -16,6 +15,11 @@ from mcp.server.fastmcp import FastMCP
 from enum import Enum
 import logging
 import anthropic
+from openai.types.chat.chat_completion_tool_param import (
+    ChatCompletionToolParam as OpenAIToolParam,
+)
+from openai.types.shared_params import FunctionDefinition
+from anthropic.types.tool_param import ToolParam as AnthropicToolParam
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +30,7 @@ class ToolParamSchema(str, Enum):
     MCP = "mcp"
 
 
-class OpenAIFunctionDef(TypedDict):
-    name: str
-    description: str
-    parameters: dict[str, Any]
-
-
-# Define TypedDict for OpenAI's tool format
-class OpenAIToolParam(TypedDict):
-    type: Literal["function"]
-    function: OpenAIFunctionDef
-
-
-UnionToolParam = Union[OpenAIToolParam, anthropic.types.ToolParam]
+UnionToolParam = Union[OpenAIToolParam, AnthropicToolParam]
 
 
 class Tool(FastMCPTool):
@@ -48,15 +40,18 @@ class Tool(FastMCPTool):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> anthropic.types.ToolParam: ...
+    ) -> anthropic.types.ToolParam:
+        ...
 
     @overload
-    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam: ...
+    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam:
+        ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> UnionToolParam: ...
+    ) -> UnionToolParam:
+        ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -67,7 +62,7 @@ class Tool(FastMCPTool):
                 # See: https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools
                 return OpenAIToolParam(
                     type="function",
-                    function=OpenAIFunctionDef(
+                    function=FunctionDefinition(
                         name=self.name,
                         description=self.description,
                         parameters=self.parameters,
@@ -99,17 +94,20 @@ class Toolkit(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]: ...
+    ) -> Sequence[anthropic.types.ToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]: ...
+    ) -> Sequence[OpenAIToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]: ...
+    ) -> Sequence[UnionToolParam]:
+        ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -158,6 +156,36 @@ class Toolkit(ABC):
                 description=tool.description,
             )
 
+    async def execute_tool(self, name: str, arguments: dict[str, Any] | str | object):
+        """Execute the tool with the given name and arguments"""
+
+        # Find the tool
+        tool = next((tool for tool in self.get_tools() if tool.name == name), None)
+        if not tool:
+            raise ValueError(f"Tool with name {name} not found")
+
+        # Try to parse the arguments
+        if not isinstance(arguments, dict):
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except Exception:
+                    logger.warning(
+                        f"Tool {name} received non-dict arguments and failed to parse as JSON: {arguments}"
+                    )
+            else:
+                logger.warning(
+                    f"Tool {name} received non-dict and non-string arguments: {arguments}"
+                )
+
+        # Log tool usage
+        logger.info(
+            f"Executing tool: {name} with arguments:"
+            f"\n{json.dumps(arguments, indent=2) if isinstance(arguments, dict) else str(arguments)}"
+        )
+
+        return await tool.run(arguments)
+
 
 class ToolkitSuite(ABC):
     """A collection of toolkits for different purposes"""
@@ -177,17 +205,20 @@ class ToolkitSuite(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]: ...
+    ) -> Sequence[anthropic.types.ToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]: ...
+    ) -> Sequence[OpenAIToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]: ...
+    ) -> Sequence[UnionToolParam]:
+        ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -213,29 +244,12 @@ class ToolkitSuite(ABC):
         """Get all tools from all toolkits"""
         return [tool for toolkit in self._toolkits for tool in toolkit.get_tools()]
 
-    async def execute_tool(self, name: str, arguments: dict[str, Any] | str):
+    async def execute_tool(self, name: str, arguments: dict[str, Any] | str | object):
         """Execute the tool with the given name and arguments"""
-        for tool in self.get_tools():
-            if tool.name == name:
-                logger.info(
-                    f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
-                )
-                processed_arguments: dict[str, Any]
-                try:
-                    if isinstance(arguments, str):
-                        processed_arguments = json.loads(arguments)
-                    else:
-                        processed_arguments = arguments
-                except Exception as e:
-                    logger.error(f"Error parsing arguments: {e}")
-                    return f"Error Parsing Arguments: {e}"
-                try:
-                    return await tool.run(processed_arguments)
-                except Exception as e:
-                    logger.error(f"Error executing tool: {e}")
-                    return f"Error Executing Tool: {e}"
-        logger.error(f"Tool with name {name} not found")
-        return f"Error Tool Not Found: {name}"
+        for toolkit in self._toolkits:
+            if name in toolkit.tool_names:
+                return await toolkit.execute_tool(name, arguments)
+        raise ValueError(f"Tool with name {name} not found")
 
 
 @dataclass(frozen=True)
