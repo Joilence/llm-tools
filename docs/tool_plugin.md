@@ -1,6 +1,6 @@
-# TLBG Toolkit Plugin
+# `llm-tools` Toolkit Plugin
 
-The TLBG Toolkit plugin allows for extending the toolkit collection through plugins.
+The `llm-tools` Toolkit plugin allows for extending the toolkit collection through plugins.
 
 ## Install a plugin
 

@@ -1,49 +1,42 @@
-import importlib
-from importlib import metadata
-import os
+import logging
 import pluggy
-import sys
 
 from ltls import hookspecs
 
+logger = logging.getLogger(__name__)
 
-DEFAULT_PLUGINS = ()
 
 pm = pluggy.PluginManager("ltls")
 pm.add_hookspecs(hookspecs)
 
-TLBG_LOAD_PLUGINS = os.environ.get("TLBG_LOAD_PLUGINS", None)
-
 _loaded = False
-
 
 def load_plugins():
     global _loaded
     if _loaded:
         return
     _loaded = True
-    if not hasattr(sys, "_called_from_test") and TLBG_LOAD_PLUGINS is None:
-        # Only load plugins if not running tests
-        pm.load_setuptools_entrypoints("ltls")
-
-    # Load any plugins specified in TLBG_LOAD_PLUGINS
-    if TLBG_LOAD_PLUGINS is not None:
-        for package_name in [
-            name for name in TLBG_LOAD_PLUGINS.split(",") if name.strip()
-        ]:
-            try:
-                distribution = metadata.distribution(package_name)  # Updated call
-                ltls_entry_points = [
-                    ep for ep in distribution.entry_points if ep.group == "ltls"
-                ]
-                for entry_point in ltls_entry_points:
-                    mod = entry_point.load()
-                    pm.register(mod, name=entry_point.name)
-                    # Ensure name can be found in plugin_to_distinfo later:
-                    pm._plugin_distinfo.append((mod, distribution))  # type: ignore
-            except metadata.PackageNotFoundError:
-                sys.stderr.write(f"Plugin {package_name} could not be found\n")
-
-    for plugin in DEFAULT_PLUGINS:
-        mod = importlib.import_module(plugin)
-        pm.register(mod, plugin)
+    
+    logger.debug(f"Loading plugins, before: {pm.get_plugins()}")
+    
+    import importlib.metadata
+    eps = importlib.metadata.entry_points()
+    
+    # Handle different Python versions and entry_points structures
+    if hasattr(eps, 'select'):
+        # Python 3.10+ style
+        ltls_eps = eps.select(group='ltls')
+        logger.debug(f"Found ltls entry points: {list(ltls_eps)}")
+    elif isinstance(eps, dict):
+        # Older style
+        if 'ltls' in eps:
+            logger.debug(f"Found ltls entry points: {eps['ltls']}")
+    else:
+        # Python 3.12+ style with different structure
+        for group in eps.groups:
+            if group == 'ltls':
+                logger.debug("Found ltls entry points in group")
+    
+    pm.load_setuptools_entrypoints("ltls")
+    
+    logger.debug(f"Loaded: {pm.get_plugins()}")
