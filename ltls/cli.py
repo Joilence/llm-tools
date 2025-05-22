@@ -11,14 +11,21 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-def cli():
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug logging for ltls and plugins.",
+)
+def cli(debug: bool):
     """ltls (llm llm tools) offers common tools to build tools for LLM"""
-    pass
+    if debug:
+        logging.basicConfig(level=logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
 
 
 @cli.command()
 def mcp():
-    """Start ltls as mcp server with all available tools"""
+    """Start ltls as an MCP server with all available tools"""
     from mcp.server.fastmcp import FastMCP
 
     tool_suite = ToolkitSuite(toolkits=[])
@@ -47,7 +54,8 @@ def mcp():
 @click.option(
     "-e",
     "--editable",
-    help="Install a project in editable mode from this path",
+    is_flag=True,
+    help="Install packages in editable mode",
 )
 @click.option(
     "--force-reinstall",
@@ -59,21 +67,31 @@ def mcp():
     is_flag=True,
     help="Disable the cache",
 )
-def install(packages, upgrade, editable, force_reinstall, no_cache_dir):
+@click.pass_context
+def install(ctx, packages, upgrade, editable, force_reinstall, no_cache_dir):
     """Install packages into the same environment as ltls"""
+    if ctx.parent and ctx.parent.params.get("debug"):
+        logger.debug("Install command called with debug mode.")
+    if not packages:
+        click.echo("Error: No packages specified")
+        sys.exit(1)
+
     args = ["pip", "install"]
     if upgrade:
-        args += ["--upgrade"]
+        args.append("--upgrade")
     if editable:
-        args += ["--editable", editable]
+        args.append("--editable")
     if force_reinstall:
-        args += ["--force-reinstall"]
+        args.append("--force-reinstall")
     if no_cache_dir:
-        args += ["--no-cache-dir"]
-    args += list(packages)
+        args.append("--no-cache-dir")
+    args.extend(packages)
+
+    # Debug output
+    click.echo(f"Running: {' '.join(args)}")
+
     sys.argv = args
     run_module("pip", run_name="__main__")
-
 
 @cli.command()
 @click.option(
@@ -82,8 +100,11 @@ def install(packages, upgrade, editable, force_reinstall, no_cache_dir):
     is_flag=True,
     help="Show detail of the tools",
 )
-def list(detail: bool):
+@click.pass_context
+def list(ctx, detail: bool):
     """List all available tools"""
+    if ctx.parent and ctx.parent.params.get("debug"):
+        logger.debug("List command called with debug mode.")
     load_plugins()
 
     suite = ToolkitSuite(toolkits=[])
