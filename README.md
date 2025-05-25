@@ -83,11 +83,13 @@ uv tool install git+https://github.com/Joilence/llm-tools
 # Check commands
 ltls --help
 
-# Install a tool
-ltls install <tool_name>
+# Install a tool (uses pip install under the hood)
+ltls install <package_name_or_git_url>
 
 # List installed tools
-ltls plugins
+ltls list
+# List installed tools with details (description and parameters)
+ltls list --detail
 
 # Start MCP server with installed tools
 ltls mcp
