@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from typing import (
     Callable,
+    Optional,
     Any,
     Literal,
     Union,
@@ -199,8 +200,8 @@ class ToolkitSuite(ABC):
             result.extend(toolkit.tool_names)
         return result
 
-    def __init__(self, toolkits: list[Toolkit]):
-        self._toolkits = toolkits
+    def __init__(self, toolkits: Optional[list[Toolkit]] = None):
+        self._toolkits = toolkits or []
 
     @overload
     def as_param(
