@@ -1,6 +1,8 @@
 import json
 from dataclasses import dataclass
+
 from typing import (
+    Annotated,
     Callable,
     Optional,
     Any,
@@ -41,18 +43,15 @@ class Tool(FastMCPTool):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> anthropic.types.ToolParam:
-        ...
+    ) -> anthropic.types.ToolParam: ...
 
     @overload
-    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam:
-        ...
+    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> UnionToolParam:
-        ...
+    ) -> UnionToolParam: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -95,20 +94,17 @@ class Toolkit(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]:
-        ...
+    ) -> Sequence[anthropic.types.ToolParam]: ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]:
-        ...
+    ) -> Sequence[OpenAIToolParam]: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]:
-        ...
+    ) -> Sequence[UnionToolParam]: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -206,20 +202,17 @@ class ToolkitSuite(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]:
-        ...
+    ) -> Sequence[anthropic.types.ToolParam]: ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]:
-        ...
+    ) -> Sequence[OpenAIToolParam]: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]:
-        ...
+    ) -> Sequence[UnionToolParam]: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -260,7 +253,15 @@ class ToolDef:
     description: str
 
 
-def tool_def(name: str, description: str | None = None):
+def tool_def(
+    name: Annotated[
+        Optional[str], "Name of the tool, by default will be the name of the function"
+    ] = None,
+    description: Annotated[
+        Optional[str],
+        "Description of the tool, by default will be the docstring of the function",
+    ] = None,
+):
     """Decorator that attaches tool metadata to a method."""
 
     def deco(fn: Callable) -> Callable:
@@ -268,7 +269,9 @@ def tool_def(name: str, description: str | None = None):
             fn,
             "_tool_def",
             ToolDef(
-                fn=fn, name=name, description=description or (fn.__doc__ or "").strip()
+                fn=fn,
+                name=name or fn.__name__,
+                description=description or (fn.__doc__ or "").strip(),
             ),
         )
         return fn

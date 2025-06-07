@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from ltls.types import ToolParamSchema, Tool, Toolkit, ToolkitSuite, tool_def
 from mcp.server.fastmcp import FastMCP
 import json
+from typing import Annotated
 
 
 class TestToolParamMode:
@@ -68,132 +69,132 @@ class TestTool:
             tool.as_param(mode=ToolParamSchema.MCP)
 
 
-class MyToolkit(Toolkit):
-    """A simple toolkit for testing."""
-
-    @tool_def(name="test_tool", description="A test tool")
-    def test_tool(self, param1: str):
-        """A tool for testing."""
-        return f"Executed with {param1}"
 
 
 class TestToolkit:
-    def test_name_returns_class_name(self):
+    def test_name_returns_class_name(self, test_toolkit):
         """Test that Toolkit.name returns the class name."""
-        toolkit = MyToolkit()
-        assert toolkit.name == "MyToolkit"
+        assert test_toolkit.name == "TestToolkit"
 
     @patch.object(Tool, "from_function")
-    def test_get_tools_finds_decorated_methods(self, mock_from_function):
+    def test_get_tools_finds_decorated_methods(self, mock_from_function, test_toolkit):
         """Test that Toolkit.get_tools finds methods decorated with tool_def."""
         # Setup mock
         mock_tool = MagicMock(spec=Tool)
-        mock_tool.name = "test_tool"
-        mock_tool.description = "A test tool"
+        mock_tool.name = "simple_param_tool_name"
+        mock_tool.description = "Description from decorator"
         mock_from_function.return_value = mock_tool
 
         # Execute
-        toolkit = MyToolkit()
-        tools = toolkit.get_tools()
+        tools = test_toolkit.get_tools()
 
-        # Verify
-        assert len(tools) == 1
-        assert tools[0].name == "test_tool"
-        assert tools[0].description == "A test tool"
-        mock_from_function.assert_called_once()
+        # Verify - TestToolkit has 2 tools
+        assert len(tools) == 2
+        # Each tool is mocked to return the same mock_tool
+        assert tools[0].name == "simple_param_tool_name"
+        assert tools[0].description == "Description from decorator"
+        assert mock_from_function.call_count == 2
 
     @patch.object(Tool, "from_function")
-    def test_tool_names(self, mock_from_function):
+    def test_tool_names(self, mock_from_function, test_toolkit):
         """Test that Toolkit.tool_names returns the names of all tools."""
-        # Setup mock
-        mock_tool = MagicMock(spec=Tool)
-        mock_tool.name = "test_tool"
-        mock_from_function.return_value = mock_tool
-
-        # Execute
-        toolkit = MyToolkit()
+        # Setup mocks for both tools
+        mock_tool1 = MagicMock(spec=Tool)
+        mock_tool1.name = "simple_param_tool_name"
+        mock_tool2 = MagicMock(spec=Tool)
+        mock_tool2.name = "complicated_param_tool_name"
+        mock_from_function.side_effect = [mock_tool1, mock_tool2]
 
         # Verify
-        assert toolkit.tool_names == ["test_tool"]
+        assert test_toolkit.tool_names == ["simple_param_tool_name", "complicated_param_tool_name"]
 
     @patch.object(Tool, "from_function")
     @patch.object(Tool, "as_param")
-    def test_as_param(self, mock_as_param, mock_from_function):
+    def test_as_param(self, mock_as_param, mock_from_function, test_toolkit):
         """Test that Toolkit.as_param returns a list of tool parameters."""
-        # Setup mocks
-        mock_tool = MagicMock(spec=Tool)
-        mock_from_function.return_value = mock_tool
-        # Return a concrete value instead of another mock
-        mock_as_param.return_value = {"function": {"name": "test_tool"}}
-        # Attach the mock_as_param to the mock_tool
-        mock_tool.as_param = mock_as_param
+        # Setup mocks for both tools
+        mock_tool1 = MagicMock(spec=Tool)
+        mock_tool2 = MagicMock(spec=Tool)
+        mock_from_function.side_effect = [mock_tool1, mock_tool2]
+        
+        # Return different values for each tool
+        mock_as_param.side_effect = [
+            {"function": {"name": "simple_param_tool_name"}},
+            {"function": {"name": "complicated_param_tool_name"}}
+        ]
+        # Attach the mock_as_param to both mock tools
+        mock_tool1.as_param = mock_as_param
+        mock_tool2.as_param = mock_as_param
 
         # Execute
-        toolkit = MyToolkit()
-        params = toolkit.as_param(mode=ToolParamSchema.OPENAI)
+        params = test_toolkit.as_param(mode=ToolParamSchema.OPENAI)
 
         # Verify
-        assert len(params) == 1
+        assert len(params) == 2
         # The result should be exactly what we mocked
-        assert params[0] == {"function": {"name": "test_tool"}}
+        assert params[0] == {"function": {"name": "simple_param_tool_name"}}
+        assert params[1] == {"function": {"name": "complicated_param_tool_name"}}
 
     @patch.object(Tool, "from_function")
-    def test_register_mcp(self, mock_from_function):
+    def test_register_mcp(self, mock_from_function, test_toolkit):
         """Test that Toolkit.register_mcp registers tools with MCP."""
-        # Setup mocks
-        mock_tool = MagicMock(spec=Tool)
-        mock_tool.name = "test_tool"
-        mock_tool.description = "A test tool"
-        mock_tool.fn = lambda x: None
-        mock_from_function.return_value = mock_tool
+        # Setup mocks for both tools
+        mock_tool1 = MagicMock(spec=Tool)
+        mock_tool1.name = "simple_param_tool_name"
+        mock_tool1.description = "Description from decorator"
+        mock_tool1.fn = lambda x: None
+        mock_tool2 = MagicMock(spec=Tool)
+        mock_tool2.name = "complicated_param_tool_name"
+        mock_tool2.description = "Annotated parameter tool from docstring"
+        mock_tool2.fn = lambda x: None
+        mock_from_function.side_effect = [mock_tool1, mock_tool2]
 
         mock_mcp = MagicMock(spec=FastMCP)
 
         # Execute
-        toolkit = MyToolkit()
-        toolkit.register_mcp(mock_mcp)
+        test_toolkit.register_mcp(mock_mcp)
 
-        # Verify
-        mock_mcp.add_tool.assert_called_once()
-        args, kwargs = mock_mcp.add_tool.call_args
-        assert kwargs["name"] == "test_tool"
+        # Verify - both tools should be registered
+        assert mock_mcp.add_tool.call_count == 2
 
 
-class AnotherToolkit(Toolkit):
-    """Another simple toolkit for testing."""
+@pytest.fixture
+def another_test_toolkit():
+    class AnotherTestToolkit(Toolkit):
+        """Another simple toolkit for testing."""
 
-    @tool_def(name="another_tool", description="Another test tool")
-    def another_tool(self, param1: str):
-        """Another tool for testing."""
-        return f"Another executed with {param1}"
+        @tool_def(name="another_tool", description="Another test tool")
+        def another_tool(self, param1: str):
+            """Another tool for testing."""
+            return f"Another executed with {param1}"
+    
+    return AnotherTestToolkit()
 
 
 class TestToolkitSuite:
     @patch.object(Tool, "from_function")
-    def test_init(self, mock_from_function):
+    def test_init(self, mock_from_function, test_toolkit, another_test_toolkit):
         """Test that ToolkitSuite initializes with a list of toolkits."""
         # Setup mock
         mock_tool = MagicMock(spec=Tool)
         mock_from_function.return_value = mock_tool
 
         # Execute
-        toolkit1 = MyToolkit()
-        toolkit2 = AnotherToolkit()
-        suite = ToolkitSuite([toolkit1, toolkit2])
+        suite = ToolkitSuite([test_toolkit, another_test_toolkit])
 
         # Verify
         assert len(suite._toolkits) == 2
 
     @patch.object(Toolkit, "tool_names")
-    def test_tool_names(self, mock_tool_names):
+    def test_tool_names(self, mock_tool_names, test_toolkit, another_test_toolkit):
         """Test that ToolkitSuite.tool_names returns all tool names from all toolkits."""
         # Setup mock - each toolkit returns a list of tool names
         mock_tool_names.__get__ = MagicMock(
-            side_effect=[["test_tool"], ["another_tool"]]
+            side_effect=[["simple_param_tool_name"], ["another_tool"]]
         )
 
         # Execute
-        suite = ToolkitSuite([MyToolkit(), AnotherToolkit()])
+        suite = ToolkitSuite([test_toolkit, another_test_toolkit])
 
         # Verify: make a new assertion that doesn't depend on tool_names property's implementation
         assert len(suite._toolkits) == 2
@@ -205,7 +206,7 @@ class TestToolkitSuite:
         """Test that ToolkitSuite.as_param returns all tool parameters from all toolkits."""
         # Create a toolkit with a mocked implementation that returns our expected output directly
         toolkit1 = MagicMock(spec=Toolkit)
-        toolkit1.as_param.return_value = [{"function": {"name": "test_tool"}}]
+        toolkit1.as_param.return_value = [{"function": {"name": "simple_param_tool_name"}}]
 
         toolkit2 = MagicMock(spec=Toolkit)
         toolkit2.as_param.return_value = [{"function": {"name": "another_tool"}}]
@@ -219,7 +220,7 @@ class TestToolkitSuite:
         # Verify
         assert len(params) == 2
         # Access function and name in a way that doesn't trigger type errors
-        assert params[0].get("function", {}).get("name") == "test_tool"
+        assert params[0].get("function", {}).get("name") == "simple_param_tool_name"
         assert params[1].get("function", {}).get("name") == "another_tool"
 
         # Verify the as_param method was called on both toolkits with correct parameters
@@ -227,7 +228,7 @@ class TestToolkitSuite:
         toolkit2.as_param.assert_called_once_with(ToolParamSchema.OPENAI)
 
     @patch.object(Tool, "from_function")
-    def test_register_mcp(self, mock_from_function):
+    def test_register_mcp(self, mock_from_function, test_toolkit, another_test_toolkit):
         """Test that ToolkitSuite.register_mcp registers all toolkits with MCP."""
         # Setup mock
         mock_tool = MagicMock(spec=Tool)
@@ -235,61 +236,55 @@ class TestToolkitSuite:
 
         # Execute
         mock_mcp = MagicMock(spec=FastMCP)
-        toolkit1 = MyToolkit()
-        toolkit2 = AnotherToolkit()
 
         # Patch register_mcp to avoid call to actual get_tools
         with patch.object(Toolkit, "register_mcp") as mock_register:
-            suite = ToolkitSuite([toolkit1, toolkit2])
+            suite = ToolkitSuite([test_toolkit, another_test_toolkit])
             suite.register_mcp(mock_mcp)
 
             # Verify
             assert mock_register.call_count == 2
 
     @patch.object(Tool, "from_function")
-    def test_add_toolkit(self, mock_from_function):
+    def test_add_toolkit(self, mock_from_function, test_toolkit, another_test_toolkit):
         """Test that ToolkitSuite.add_toolkit adds a toolkit to the suite."""
         # Setup mock
         mock_tool = MagicMock(spec=Tool)
         mock_from_function.return_value = mock_tool
 
         # Execute
-        toolkit1 = MyToolkit()
-        suite = ToolkitSuite([toolkit1])
+        suite = ToolkitSuite([test_toolkit])
 
-        toolkit2 = AnotherToolkit()
-        suite.add_toolkit(toolkit2)
+        suite.add_toolkit(another_test_toolkit)
 
         # Verify
         assert len(suite._toolkits) == 2
-        assert suite._toolkits[1] == toolkit2
+        assert suite._toolkits[1] == another_test_toolkit
 
     @patch.object(Tool, "from_function")
-    def test_get_toolkits(self, mock_from_function):
+    def test_get_toolkits(self, mock_from_function, test_toolkit, another_test_toolkit):
         """Test that ToolkitSuite.get_toolkits returns all toolkits."""
         # Setup mock
         mock_tool = MagicMock(spec=Tool)
         mock_from_function.return_value = mock_tool
 
         # Execute
-        toolkit1 = MyToolkit()
-        toolkit2 = AnotherToolkit()
-        suite = ToolkitSuite([toolkit1, toolkit2])
+        suite = ToolkitSuite([test_toolkit, another_test_toolkit])
 
         toolkits = suite.get_toolkits()
 
         # Verify
         assert len(toolkits) == 2
-        assert toolkits[0] == toolkit1
-        assert toolkits[1] == toolkit2
+        assert toolkits[0] == test_toolkit
+        assert toolkits[1] == another_test_toolkit
 
     @patch.object(Tool, "from_function")
     @patch.object(Toolkit, "get_tools")
-    def test_get_tools(self, mock_get_tools, mock_from_function):
+    def test_get_tools(self, mock_get_tools, mock_from_function, test_toolkit, another_test_toolkit):
         """Test that ToolkitSuite.get_tools returns all tools from all toolkits."""
         # Setup mocks
         mock_tool1 = MagicMock(spec=Tool)
-        mock_tool1.name = "test_tool"
+        mock_tool1.name = "simple_param_tool_name"
         mock_tool2 = MagicMock(spec=Tool)
         mock_tool2.name = "another_tool"
 
@@ -297,64 +292,60 @@ class TestToolkitSuite:
         mock_get_tools.side_effect = [[mock_tool1], [mock_tool2]]
 
         # Execute
-        toolkit1 = MyToolkit()
-        toolkit2 = AnotherToolkit()
-        suite = ToolkitSuite([toolkit1, toolkit2])
+        suite = ToolkitSuite([test_toolkit, another_test_toolkit])
 
         tools = suite.get_tools()
 
         # Verify
         assert len(tools) == 2
-        assert tools[0].name == "test_tool"
+        assert tools[0].name == "simple_param_tool_name"
         assert tools[1].name == "another_tool"
 
     @pytest.mark.asyncio
     async def test_execute_tool(self):
         """Test that ToolkitSuite.execute_tool executes the right tool with the right arguments."""
-        # Create a mock tool with an async run method
-        mock_tool = MagicMock(spec=Tool)
-        mock_tool.name = "mock_tool"
-        mock_tool.run = AsyncMock(return_value="mock_result")
+        # Create a mock toolkit with execute_tool method
+        mock_toolkit = MagicMock(spec=Toolkit)
+        mock_toolkit.tool_names = ["mock_tool"]
+        mock_toolkit.execute_tool = AsyncMock(return_value="mock_result")
 
-        # Create a suite with a mock get_tools method
-        suite = ToolkitSuite([])
-        with patch.object(ToolkitSuite, "get_tools", return_value=[mock_tool]):
-            # Execute the tool
-            result = await suite.execute_tool("mock_tool", {"arg": "value"})
+        # Create a suite with the mock toolkit
+        suite = ToolkitSuite([mock_toolkit])
+        
+        # Execute the tool
+        result = await suite.execute_tool("mock_tool", {"arg": "value"})
 
-            # Verify
-            mock_tool.run.assert_called_once_with({"arg": "value"})
-            assert result == "mock_result"
+        # Verify
+        mock_toolkit.execute_tool.assert_called_once_with("mock_tool", {"arg": "value"})
+        assert result == "mock_result"
 
     @pytest.mark.asyncio
     async def test_execute_tool_not_found(self):
-        """Test that ToolkitSuite.execute_tool returns an error message when the tool is not found."""
+        """Test that ToolkitSuite.execute_tool raises ValueError when the tool is not found."""
         # Create a suite with an empty tools list
         suite = ToolkitSuite([])
-        with patch.object(ToolkitSuite, "get_tools", return_value=[]):
-            # Execute a non-existent tool
-            result = await suite.execute_tool("non_existent_tool", {})
-
-            # Verify
-            assert "Error Tool Not Found: non_existent_tool" in result
+        
+        # Execute a non-existent tool and expect a ValueError
+        with pytest.raises(ValueError, match="Tool with name non_existent_tool not found"):
+            await suite.execute_tool("non_existent_tool", {})
 
     @pytest.mark.asyncio
     async def test_execute_tool_string_arguments(self):
         """Test that ToolkitSuite.execute_tool handles string arguments."""
-        # Create a mock tool with an async run method
-        mock_tool = MagicMock(spec=Tool)
-        mock_tool.name = "mock_tool"
-        mock_tool.run = AsyncMock(return_value="mock_result")
+        # Create a mock toolkit with execute_tool method
+        mock_toolkit = MagicMock(spec=Toolkit)
+        mock_toolkit.tool_names = ["mock_tool"]
+        mock_toolkit.execute_tool = AsyncMock(return_value="mock_result")
 
-        # Create a suite with a mock get_tools method
-        suite = ToolkitSuite([])
-        with patch.object(ToolkitSuite, "get_tools", return_value=[mock_tool]):
-            # Execute the tool with a JSON string
-            result = await suite.execute_tool("mock_tool", json.dumps({"arg": "value"}))
+        # Create a suite with the mock toolkit
+        suite = ToolkitSuite([mock_toolkit])
+        
+        # Execute the tool with a JSON string
+        result = await suite.execute_tool("mock_tool", json.dumps({"arg": "value"}))
 
-            # Verify
-            mock_tool.run.assert_called_once_with({"arg": "value"})
-            assert result == "mock_result"
+        # Verify
+        mock_toolkit.execute_tool.assert_called_once_with("mock_tool", json.dumps({"arg": "value"}))
+        assert result == "mock_result"
 
 
 class TestToolDef:
