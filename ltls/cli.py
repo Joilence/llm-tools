@@ -93,6 +93,7 @@ def install(ctx, packages, upgrade, editable, force_reinstall, no_cache_dir):
     sys.argv = args
     run_module("pip", run_name="__main__")
 
+
 @cli.command()
 @click.option(
     "-d",

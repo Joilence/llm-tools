@@ -43,15 +43,18 @@ class Tool(FastMCPTool):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> anthropic.types.ToolParam: ...
+    ) -> anthropic.types.ToolParam:
+        ...
 
     @overload
-    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam: ...
+    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam:
+        ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> UnionToolParam: ...
+    ) -> UnionToolParam:
+        ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -94,17 +97,20 @@ class Toolkit(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]: ...
+    ) -> Sequence[anthropic.types.ToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]: ...
+    ) -> Sequence[OpenAIToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]: ...
+    ) -> Sequence[UnionToolParam]:
+        ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -153,7 +159,7 @@ class Toolkit(ABC):
                 description=tool.description,
             )
 
-    async def execute_tool(self, name: str, arguments: dict[str, Any] | str | object):
+    async def execute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments"""
 
         # Find the tool
@@ -202,17 +208,20 @@ class ToolkitSuite(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]: ...
+    ) -> Sequence[anthropic.types.ToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]: ...
+    ) -> Sequence[OpenAIToolParam]:
+        ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]: ...
+    ) -> Sequence[UnionToolParam]:
+        ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -238,7 +247,7 @@ class ToolkitSuite(ABC):
         """Get all tools from all toolkits"""
         return [tool for toolkit in self._toolkits for tool in toolkit.get_tools()]
 
-    async def execute_tool(self, name: str, arguments: dict[str, Any] | str | object):
+    async def execute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments"""
         for toolkit in self._toolkits:
             if name in toolkit.tool_names:
