@@ -1,37 +1,76 @@
 import json
+from typing import Annotated, Optional
 import ltls
-from pydantic import BaseModel, Field
+from pydantic import Field
 import pytest
 
 
 class TestToolkit(ltls.Toolkit):
     """A simple toolkit for testing."""
 
-    @ltls.tool_def(
-        name="simple_param_tool_name", description="Description from decorator"
-    )
-    def simple_param_tool(
-        self, param: str = Field(description="Annotation to the parameter")
-    ):
-        """simple param tool description from docstring"""
-        return f"Executed with {param}"
+    def __init__(self, tools=None):
+        super().__init__(tools)
 
-    class ComplicatedParam(BaseModel):
-        str_param: str = Field(description="A string parameter")
-        int_param: int = Field(description="An int parameter")
-
-    @ltls.tool_def(name="complicated_param_tool_name")
-    def complicated_param_tool(
+    @ltls.tool_def(name="tool_with_params")
+    def tool_with_params(
         self,
-        param: ComplicatedParam,
+        str_param: Annotated[str, Field(description="A required string parameter")],
+        int_param: Annotated[
+            Optional[int], Field(description="An optional int parameter")
+        ] = None,
+        bool_param: Annotated[
+            bool,
+            Field(
+                description="An optional boolean parameter with default value to False",
+            ),
+        ] = False,
     ):
         """Annotated parameter tool from docstring"""
-        return f"Executed with {param}"
+        return f"Executed with {str_param}, {int_param} and {bool_param}"
+
+
+@ltls.tool_def()
+def external_tool_function(
+    str_param: Annotated[str, Field(description="A required string parameter")],
+    int_param: Annotated[
+        Optional[int], Field(description="An optional int parameter")
+    ] = None,
+    bool_param: Annotated[
+        bool,
+        Field(
+            description="An optional boolean parameter with default value to False",
+        ),
+    ] = False,
+):
+    """External tool with annotated parameters"""
+    return f"Executed external tool with {str_param}, {int_param} and {bool_param}"
 
 
 @pytest.fixture
 def test_toolkit():
     return TestToolkit()
+
+@pytest.fixture
+def external_tool():
+    return ltls.Tool.from_function(
+        fn=external_tool_function,
+        name=external_tool_function._tool_def.name,
+        description=external_tool_function._tool_def.description,
+    )
+
+@pytest.fixture
+def test_toolkit_with_external_tools(external_tool):
+    toolkit = TestToolkit()
+    toolkit.add_tools(external_tool)
+    return toolkit
+
+@pytest.fixture
+def empty_test_toolkit():
+    return TestToolkit()
+
+@pytest.fixture 
+def test_toolkit_constructor_with_external(external_tool):
+    return TestToolkit(tools=[external_tool])
 
 
 if __name__ == "__main__":

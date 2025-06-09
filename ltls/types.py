@@ -1,4 +1,5 @@
 import json
+import functools
 from dataclasses import dataclass
 
 from typing import (
@@ -86,6 +87,9 @@ class Tool(FastMCPTool):
 class Toolkit(ABC):
     """A set of tools that supposed to work together"""
 
+    def __init__(self, tools: Optional[list[Tool]] = None):
+        self._external_tools: list[Tool] = tools or []
+
     @property
     def name(self) -> str:
         return self.__class__.__name__
@@ -119,17 +123,18 @@ class Toolkit(ABC):
         tools = self.get_tools()
         return [tool.as_param(mode) for tool in tools]
 
-    def get_tools(self) -> list[Tool]:
+    @functools.cached_property
+    def _member_tools(self) -> list[Tool]:
         """Automatically pickup all tools in the class, which:
         - are functions
         - are decorated with `tool_def`
         """
         tool_functions = []
         for attr_name in dir(self):
-            # First check if the attribute on the class is a property
+            # First check if the attribute on the class is a property or cached_property
             class_attr = getattr(type(self), attr_name, None)
-            if isinstance(class_attr, property):
-                # Skip properties
+            if isinstance(class_attr, (property, functools.cached_property)):
+                # Skip properties and cached_properties
                 continue
 
             # Then get the instance attribute
@@ -148,6 +153,19 @@ class Toolkit(ABC):
             )
             for tool_function in tool_functions
         ]
+
+    def get_tools(self) -> list[Tool]:
+        """Get all tools: member tools + external tools (external overrides member)"""
+        tools_dict = {tool.name: tool for tool in self._member_tools}
+        for tool in self._external_tools:
+            tools_dict[tool.name] = tool  # External tools override member tools
+        return list(tools_dict.values())
+
+    def add_tools(self, tools: Union[Tool, list[Tool]]) -> None:
+        """Add external tools to the toolkit"""
+        if isinstance(tools, Tool):
+            tools = [tools]
+        self._external_tools.extend(tools)
 
     def register_mcp(self, mcp: FastMCP):
         """Register the tools in the toolkit with the given MCP instance."""
