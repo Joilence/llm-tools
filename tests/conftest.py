@@ -51,26 +51,14 @@ def test_toolkit():
     return TestToolkit()
 
 @pytest.fixture
-def external_tool():
-    return ltls.Tool.from_function(
-        fn=external_tool_function,
-        name=external_tool_function._tool_def.name,
-        description=external_tool_function._tool_def.description,
-    )
-
-@pytest.fixture
-def test_toolkit_with_external_tools(external_tool):
+def test_toolkit_with_external_tools():
     toolkit = TestToolkit()
-    toolkit.add_tools(external_tool)
+    toolkit.add_tools(external_tool_function)  # Direct function usage!
     return toolkit
 
-@pytest.fixture
-def empty_test_toolkit():
-    return TestToolkit()
-
 @pytest.fixture 
-def test_toolkit_constructor_with_external(external_tool):
-    return TestToolkit(tools=[external_tool])
+def test_toolkit_constructor_with_external():
+    return TestToolkit(tools=[external_tool_function])  # Direct function usage!
 
 
 if __name__ == "__main__":

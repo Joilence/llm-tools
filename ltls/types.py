@@ -87,8 +87,10 @@ class Tool(FastMCPTool):
 class Toolkit(ABC):
     """A set of tools that supposed to work together"""
 
-    def __init__(self, tools: Optional[list[Tool]] = None):
-        self._external_tools: list[Tool] = tools or []
+    def __init__(self, tools: Optional[list[Union[Tool, Callable]]] = None):
+        self._external_tools: list[Tool] = []
+        if tools:
+            self.add_tools(tools)
 
     @property
     def name(self) -> str:
@@ -161,11 +163,28 @@ class Toolkit(ABC):
             tools_dict[tool.name] = tool  # External tools override member tools
         return list(tools_dict.values())
 
-    def add_tools(self, tools: Union[Tool, list[Tool]]) -> None:
-        """Add external tools to the toolkit"""
-        if isinstance(tools, Tool):
+    def add_tools(self, tools: Union[Tool, Callable, list[Union[Tool, Callable]]]) -> None:
+        """Add external tools to the toolkit
+        
+        Args:
+            tools: Tool instances or decorated functions (with @tool_def), or list of either
+        """
+        if not isinstance(tools, list):
             tools = [tools]
-        self._external_tools.extend(tools)
+        
+        for tool in tools:
+            if isinstance(tool, Tool):
+                self._external_tools.append(tool)
+            elif callable(tool) and hasattr(tool, "_tool_def"):
+                # Convert decorated function to Tool instance
+                tool_instance = Tool.from_function(
+                    fn=tool,
+                    name=tool._tool_def.name,
+                    description=tool._tool_def.description,
+                )
+                self._external_tools.append(tool_instance)
+            else:
+                raise ValueError(f"Invalid tool: {tool}. Must be Tool instance or function decorated with @tool_def")
 
     def register_mcp(self, mcp: FastMCP):
         """Register the tools in the toolkit with the given MCP instance."""

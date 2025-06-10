@@ -16,25 +16,40 @@ class TestToolParamMode:
 
 
 class TestTool:
-    def test_as_param_openai(self, external_tool):
+    def test_as_param_openai(self):
         """Test OpenAI parameter format with real tool."""
-        param = external_tool.as_param(ToolParamSchema.OPENAI)
+        tool = Tool.from_function(
+            fn=external_tool_function,
+            name=external_tool_function._tool_def.name,
+            description=external_tool_function._tool_def.description,
+        )
+        param = tool.as_param(ToolParamSchema.OPENAI)
         assert param["type"] == "function"
         assert param["function"]["name"] == "external_tool_function"
         assert param["function"]["description"] == "External tool with annotated parameters"
         assert "parameters" in param["function"]
 
-    def test_as_param_anthropic(self, external_tool):
+    def test_as_param_anthropic(self):
         """Test Anthropic parameter format with real tool."""
-        param = external_tool.as_param(ToolParamSchema.ANTHROPIC)
+        tool = Tool.from_function(
+            fn=external_tool_function,
+            name=external_tool_function._tool_def.name,
+            description=external_tool_function._tool_def.description,
+        )
+        param = tool.as_param(ToolParamSchema.ANTHROPIC)
         assert param["name"] == "external_tool_function"
         assert param["description"] == "External tool with annotated parameters"
         assert "input_schema" in param
 
-    def test_as_param_unsupported(self, external_tool):
+    def test_as_param_unsupported(self):
         """Test that using an unsupported mode raises NotImplementedError."""
+        tool = Tool.from_function(
+            fn=external_tool_function,
+            name=external_tool_function._tool_def.name,
+            description=external_tool_function._tool_def.description,
+        )
         with pytest.raises(NotImplementedError):
-            external_tool.as_param(mode=ToolParamSchema.MCP)
+            tool.as_param(mode=ToolParamSchema.MCP)
 
 
 class TestToolkit:
@@ -68,39 +83,45 @@ class TestToolkit:
 
 
 class TestToolkitExternalTools:
-    def test_add_tools_single_tool(self, test_toolkit, external_tool):
-        """Test adding a single external tool."""
-        test_toolkit.add_tools(external_tool)
+    def test_add_tools_single_function(self, test_toolkit):
+        """Test adding a single decorated function."""
+        test_toolkit.add_tools(external_tool_function)
         tools = test_toolkit.get_tools()
         assert len(tools) == 2  # 1 member + 1 external
         tool_names = [t.name for t in tools]
         assert "tool_with_params" in tool_names
         assert "external_tool_function" in tool_names
 
-    def test_add_tools_list_of_tools(self, test_toolkit, external_tool):
-        """Test adding a list of external tools."""
-        test_toolkit.add_tools([external_tool])
+    def test_add_tools_list_of_functions(self, test_toolkit):
+        """Test adding a list of decorated functions."""
+        test_toolkit.add_tools([external_tool_function])
         assert len(test_toolkit.get_tools()) == 2
 
-    def test_constructor_with_external_tools(self, test_toolkit_constructor_with_external):
-        """Test creating toolkit with external tools in constructor."""
+    def test_add_tools_mixed_types(self, test_toolkit):
+        """Test adding mix of Tool instances and decorated functions."""
+        tool_instance = Tool.from_function(
+            fn=external_tool_function,
+            name="manual_tool",
+            description="Manually created tool",
+        )
+        test_toolkit.add_tools([external_tool_function, tool_instance])
+        assert len(test_toolkit.get_tools()) == 3  # 1 member + 2 external
+
+    def test_constructor_with_external_functions(self, test_toolkit_constructor_with_external):
+        """Test creating toolkit with decorated functions in constructor."""
         toolkit = test_toolkit_constructor_with_external
         assert len(toolkit.get_tools()) == 2
         tool_names = [t.name for t in toolkit.get_tools()]
         assert "tool_with_params" in tool_names
         assert "external_tool_function" in tool_names
 
-    def test_external_tools_override_member_tools(self, test_toolkit):
-        """Test that external tools override member tools with same name."""
-        override_tool = Tool.from_function(
-            fn=external_tool_function,
-            name="tool_with_params",  # Same name as member tool
-            description="Override description",
-        )
-        test_toolkit.add_tools(override_tool)
-        tools = test_toolkit.get_tools()
-        assert len(tools) == 1  # Same name, so override
-        assert tools[0].description == "Override description"
+    def test_add_tools_invalid_input(self, test_toolkit):
+        """Test that invalid inputs raise ValueError."""
+        def undecorated_function():
+            pass
+        
+        with pytest.raises(ValueError, match="Invalid tool.*Must be Tool instance or function decorated with @tool_def"):
+            test_toolkit.add_tools(undecorated_function)
 
     def test_tool_names_includes_external(self, test_toolkit_with_external_tools):
         """Test that tool_names includes external tools."""
@@ -108,6 +129,65 @@ class TestToolkitExternalTools:
         assert len(names) == 2
         assert "tool_with_params" in names
         assert "external_tool_function" in names
+
+    @pytest.mark.asyncio
+    async def test_execute_external_tool(self, test_toolkit):
+        """Test executing an external tool."""
+        test_toolkit.add_tools(external_tool_function)
+        
+        result = await test_toolkit.execute_tool(
+            "external_tool_function", 
+            {"str_param": "test", "int_param": 42, "bool_param": True}
+        )
+        
+        assert result == "Executed external tool with test, 42 and True"
+
+    @pytest.mark.asyncio
+    async def test_execute_member_tool(self, test_toolkit):
+        """Test executing a member tool."""
+        result = await test_toolkit.execute_tool(
+            "tool_with_params",
+            {"str_param": "hello", "int_param": 123}
+        )
+        
+        assert result == "Executed with hello, 123 and False"
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_not_found(self, test_toolkit):
+        """Test that executing non-existent tool raises ValueError."""
+        with pytest.raises(ValueError, match="Tool with name non_existent not found"):
+            await test_toolkit.execute_tool("non_existent", {})
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_external_overrides_member(self, test_toolkit):
+        """Test that external tools override member tools in execution."""
+        # Create external tool with same name as member tool
+        @tool_def(name="tool_with_params", description="Override tool")
+        def override_tool(message: str):
+            return f"Override: {message}"
+        
+        test_toolkit.add_tools(override_tool)
+        
+        # Should execute the external tool, not the member tool
+        result = await test_toolkit.execute_tool(
+            "tool_with_params",
+            {"message": "testing override"}
+        )
+        
+        assert result == "Override: testing override"
+
+    @pytest.mark.asyncio 
+    async def test_execute_tool_with_string_arguments(self, test_toolkit):
+        """Test executing tool with JSON string arguments."""
+        test_toolkit.add_tools(external_tool_function)
+        
+        import json
+        result = await test_toolkit.execute_tool(
+            "external_tool_function",
+            json.dumps({"str_param": "json_test", "int_param": 99})
+        )
+        
+        assert result == "Executed external tool with json_test, 99 and False"
 
 
 @pytest.fixture
