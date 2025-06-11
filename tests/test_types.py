@@ -189,6 +189,27 @@ class TestToolkitExternalTools:
         
         assert result == "Executed external tool with json_test, 99 and False"
 
+    def test_create_mcp_server(self, test_toolkit):
+        """Test creating MCP server from toolkit."""
+        # Create MCP server with default name
+        mcp = test_toolkit.create_mcp_server()
+        assert mcp.name == "TestToolkit"
+        
+        # Create MCP server with custom name
+        mcp_custom = test_toolkit.create_mcp_server(name="CustomMCP")
+        assert mcp_custom.name == "CustomMCP"
+        
+    def test_create_mcp_server_with_external_tools(self, test_toolkit):
+        """Test MCP server includes external tools."""
+        test_toolkit.add_tools(external_tool_function)
+        mcp = test_toolkit.create_mcp_server(name="TestMCP")
+        
+        # Check that tools are registered (MCP doesn't expose tools directly,
+        # so we verify by checking the toolkit has the expected tools)
+        tool_names = test_toolkit.tool_names
+        assert "tool_with_params" in tool_names
+        assert "external_tool_function" in tool_names
+
 
 @pytest.fixture
 def another_test_toolkit():

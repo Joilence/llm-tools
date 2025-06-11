@@ -196,6 +196,20 @@ class Toolkit(ABC):
                 description=tool.description,
             )
 
+    def create_mcp_server(self, name: Optional[str] = None, **mcp_kwargs) -> FastMCP:
+        """Create and configure an MCP server with this toolkit's tools.
+        
+        Args:
+            name: Server name, defaults to toolkit class name
+            **mcp_kwargs: Additional keyword arguments to pass to FastMCP
+            
+        Returns:
+            FastMCP: Configured MCP server instance with toolkit's tools registered
+        """
+        mcp = FastMCP(name=name or self.name, **mcp_kwargs)
+        self.register_mcp(mcp)
+        return mcp
+
     async def execute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments"""
 
