@@ -149,8 +149,8 @@ class Toolkit(ABC):
                 Tool,
                 Tool.from_function(
                     fn=tool_function,
-                    name=tool_function._tool_def.name,
-                    description=tool_function._tool_def.description,
+                    name=getattr(tool_function, "_tool_def").name,
+                    description=getattr(tool_function, "_tool_def").description,
                 ),
             )
             for tool_function in tool_functions
@@ -163,28 +163,36 @@ class Toolkit(ABC):
             tools_dict[tool.name] = tool  # External tools override member tools
         return list(tools_dict.values())
 
-    def add_tools(self, tools: Union[Tool, Callable, list[Union[Tool, Callable]]]) -> None:
+    def add_tools(
+        self, tools: Union[Tool, Callable, list[Union[Tool, Callable]]]
+    ) -> None:
         """Add external tools to the toolkit
-        
+
         Args:
             tools: Tool instances or decorated functions (with @tool_def), or list of either
         """
         if not isinstance(tools, list):
             tools = [tools]
-        
+
         for tool in tools:
             if isinstance(tool, Tool):
                 self._external_tools.append(tool)
             elif callable(tool) and hasattr(tool, "_tool_def"):
                 # Convert decorated function to Tool instance
-                tool_instance = Tool.from_function(
-                    fn=tool,
-                    name=tool._tool_def.name,
-                    description=tool._tool_def.description,
+                tool_def = getattr(tool, "_tool_def")
+                tool_instance = cast(
+                    Tool,
+                    Tool.from_function(
+                        fn=tool,
+                        name=tool_def.name,
+                        description=tool_def.description,
+                    ),
                 )
                 self._external_tools.append(tool_instance)
             else:
-                raise ValueError(f"Invalid tool: {tool}. Must be Tool instance or function decorated with @tool_def")
+                raise ValueError(
+                    f"Invalid tool: {tool}. Must be Tool instance or function decorated with @tool_def"
+                )
 
     def register_mcp(self, mcp: FastMCP):
         """Register the tools in the toolkit with the given MCP instance."""
@@ -198,11 +206,11 @@ class Toolkit(ABC):
 
     def create_mcp_server(self, name: Optional[str] = None, **mcp_kwargs) -> FastMCP:
         """Create and configure an MCP server with this toolkit's tools.
-        
+
         Args:
             name: Server name, defaults to toolkit class name
             **mcp_kwargs: Additional keyword arguments to pass to FastMCP
-            
+
         Returns:
             FastMCP: Configured MCP server instance with toolkit's tools registered
         """
@@ -210,32 +218,29 @@ class Toolkit(ABC):
         self.register_mcp(mcp)
         return mcp
 
-    async def execute_tool(self, name: str, arguments: dict[str, Any]):
-        """Execute the tool with the given name and arguments"""
+    def execute_tool(self, name: str, arguments: dict[str, Any]):
+        """Execute the tool with the given name and arguments (synchronous version)"""
+        import concurrent.futures
+        import asyncio
+
+        def run_async():
+            return asyncio.run(self.aexecute_tool(name, arguments))
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async)
+            return future.result()
+
+    async def aexecute_tool(self, name: str, arguments: dict[str, Any]):
+        """Execute the tool with the given name and arguments (asynchronous version)"""
 
         # Find the tool
         tool = next((tool for tool in self.get_tools() if tool.name == name), None)
         if not tool:
             raise ValueError(f"Tool with name {name} not found")
 
-        # Try to parse the arguments
-        if not isinstance(arguments, dict):
-            if isinstance(arguments, str):
-                try:
-                    arguments = json.loads(arguments)
-                except Exception:
-                    logger.warning(
-                        f"Tool {name} received non-dict arguments and failed to parse as JSON: {arguments}"
-                    )
-            else:
-                logger.warning(
-                    f"Tool {name} received non-dict and non-string arguments: {arguments}"
-                )
-
         # Log tool usage
         logger.info(
-            f"Executing tool: {name} with arguments:"
-            f"\n{json.dumps(arguments, indent=2) if isinstance(arguments, dict) else str(arguments)}"
+            f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
         )
 
         return await tool.run(arguments)
@@ -298,11 +303,23 @@ class ToolkitSuite(ABC):
         """Get all tools from all toolkits"""
         return [tool for toolkit in self._toolkits for tool in toolkit.get_tools()]
 
-    async def execute_tool(self, name: str, arguments: dict[str, Any]):
-        """Execute the tool with the given name and arguments"""
+    def execute_tool(self, name: str, arguments: dict[str, Any]):
+        """Execute the tool with the given name and arguments (synchronous version)"""
+        import concurrent.futures
+        import asyncio
+
+        def run_async():
+            return asyncio.run(self.aexecute_tool(name, arguments))
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async)
+            return future.result()
+
+    async def aexecute_tool(self, name: str, arguments: dict[str, Any]):
+        """Execute the tool with the given name and arguments (asynchronous version)"""
         for toolkit in self._toolkits:
             if name in toolkit.tool_names:
-                return await toolkit.execute_tool(name, arguments)
+                return await toolkit.aexecute_tool(name, arguments)
         raise ValueError(f"Tool with name {name} not found")
 
 
