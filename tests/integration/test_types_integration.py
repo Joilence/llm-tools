@@ -242,25 +242,24 @@ class TestToolkitSuiteIntegration:
                 ), f"Tool '{tool_name}' not mentioned in response"
 
 
-@pytest.mark.asyncio
 @pytest.mark.integration
 class TestToolExecutionIntegration:
     """Integration tests for Tool execution."""
 
-    async def test_execute_tool(self):
+    def test_execute_tool(self):
         """Test that a tool can be executed through ToolkitSuite."""
         # Setup
         toolkit = TestIntegrationToolkit()
         suite = ToolkitSuite([toolkit])
 
         # Execute the add tool
-        result = await suite.execute_tool("add", {"a": 2, "b": 3})
+        result = suite.execute_tool("add", {"a": 2, "b": 3})
 
         # Verify
         assert result == 5
 
         # Execute the echo tool
-        result = await suite.execute_tool("echo", {"message": "hello"})
+        result = suite.execute_tool("echo", {"message": "hello"})
 
         # Verify
         assert result == "You said: hello"

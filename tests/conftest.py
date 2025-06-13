@@ -50,13 +50,15 @@ def external_tool_function(
 def test_toolkit():
     return TestToolkit()
 
+
 @pytest.fixture
 def test_toolkit_with_external_tools():
     toolkit = TestToolkit()
     toolkit.add_tools(external_tool_function)  # Direct function usage!
     return toolkit
 
-@pytest.fixture 
+
+@pytest.fixture
 def test_toolkit_constructor_with_external():
     return TestToolkit(tools=[external_tool_function])  # Direct function usage!
 
