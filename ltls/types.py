@@ -1,6 +1,7 @@
 import json
 import functools
 from dataclasses import dataclass
+import inspect
 
 from typing import (
     Annotated,
@@ -219,16 +220,45 @@ class Toolkit(ABC):
         return mcp
 
     def execute_tool(self, name: str, arguments: dict[str, Any]):
-        """Execute the tool with the given name and arguments (synchronous version)"""
-        import concurrent.futures
-        import asyncio
+        """Execute the tool with the given name and arguments synchronously
 
-        def run_async():
-            return asyncio.run(self.aexecute_tool(name, arguments))
+        NOTE: This function is added when tool function and application are designed to 
+        be synchronous, and avoid event loop conflicts if a sync tool function is using 
+        async libraries.
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_async)
-            return future.result()
+        Args:
+            name: Name of the tool to execute
+            arguments: Arguments to pass to the tool
+
+        Raises:
+            RuntimeError: If the tool is asynchronous
+        """
+
+        tool = next((tool for tool in self.get_tools() if tool.name == name), None)
+        if not tool:
+            raise ValueError(f"Tool with name {name} not found")
+
+        # Check if tool is async
+        if tool.is_async or inspect.iscoroutinefunction(tool.fn):
+            raise RuntimeError(
+                f"Tool '{name}' is asynchronous and cannot be executed synchronously. "
+                "Use aexecute_tool() instead."
+            )
+
+        # Log tool usage
+        logger.info(
+            f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
+        )
+
+        # Validate arguments using the metadata synchronously
+        arguments_pre_parsed = tool.fn_metadata.pre_parse_json(arguments)
+        arguments_parsed_model = tool.fn_metadata.arg_model.model_validate(
+            arguments_pre_parsed
+        )
+        arguments_parsed_dict = arguments_parsed_model.model_dump_one_level()
+
+        # Call the function directly (synchronously)
+        return tool.fn(**arguments_parsed_dict)
 
     async def aexecute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments (asynchronous version)"""
@@ -305,15 +335,13 @@ class ToolkitSuite(ABC):
 
     def execute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments (synchronous version)"""
-        import concurrent.futures
-        import asyncio
+        # Find which toolkit contains the tool
+        for toolkit in self._toolkits:
+            if name in toolkit.tool_names:
+                # Delegate to the toolkit's execute_tool method
+                return toolkit.execute_tool(name, arguments)
 
-        def run_async():
-            return asyncio.run(self.aexecute_tool(name, arguments))
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_async)
-            return future.result()
+        raise ValueError(f"Tool with name {name} not found")
 
     async def aexecute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments (asynchronous version)"""
