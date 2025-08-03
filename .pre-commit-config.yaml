@@ -1,12 +1,12 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.14
+    rev: v0.12.7
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.400
+    rev: v1.1.403
     hooks:
       - id: pyright
         exclude: "^examples/"
