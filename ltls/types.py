@@ -82,6 +82,35 @@ class Tool(FastMCPFunctionTool):
             case _:
                 raise NotImplementedError(f"unsupported mode: {mode}")
 
+    def execute(self, arguments: dict[str, Any]) -> Any:
+        """Execute tool synchronously, raise if function is async, return result directly without ToolResult"""
+        if inspect.iscoroutinefunction(self.fn):
+            raise RuntimeError(
+                f"Tool '{self.name}' is asynchronous and cannot be executed synchronously. "
+                "Use aexecute() instead."
+            )
+        logger.debug(
+            f"Executing tool: {self.name} with arguments:\n{json.dumps(arguments, indent=2)}"
+        )
+
+        type_adapter = get_cached_typeadapter(self.fn)
+        result = type_adapter.validate_python(arguments)
+        return result
+
+    async def aexecute(self, arguments: dict[str, Any]) -> Any:
+        """Execute tool asynchronously, return result directly without wrapping as ToolResult"""
+        logger.debug(
+            f"Executing tool: {self.name} with arguments:\n{json.dumps(arguments, indent=2)}"
+        )
+
+        type_adapter = get_cached_typeadapter(self.fn)
+        result = type_adapter.validate_python(arguments)
+
+        if inspect.isawaitable(result):
+            result = await result
+
+        return result
+
 
 class Toolkit(ABC):
     """A set of tools that supposed to work together"""
@@ -211,15 +240,11 @@ class Toolkit(ABC):
         return mcp
 
     def execute_tool(self, name: str, arguments: dict[str, Any]):
-        """Execute the tool with the given name and arguments synchronously
+        """Synchronously execute the tool with the given name and arguments
 
         NOTE: This function is added when tool function and application are designed to
         be synchronous, and avoid event loop conflicts if a sync tool function is using
         async libraries.
-
-        Args:
-            name: Name of the tool to execute
-            arguments: Arguments to pass to the tool
 
         Raises:
             RuntimeError: If the tool is asynchronous
@@ -229,36 +254,16 @@ class Toolkit(ABC):
         if not tool:
             raise ValueError(f"Tool with name {name} not found")
 
-        # Check if tool is async
-        if inspect.iscoroutinefunction(tool.fn):
-            raise RuntimeError(
-                f"Tool '{name}' is asynchronous and cannot be executed synchronously. "
-                "Use aexecute_tool() instead."
-            )
-
-        # Log tool usage
-        logger.info(
-            f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
-        )
-
-        type_adapter = get_cached_typeadapter(tool.fn)
-        result = type_adapter.validate_python(arguments)
-        return result
+        return tool.execute(arguments)
 
     async def aexecute_tool(self, name: str, arguments: dict[str, Any]):
-        """Execute the tool with the given name and arguments (asynchronous version)"""
+        """Asynchronously execute the tool with the given name and arguments"""
 
-        # Find the tool
         tool = next((tool for tool in self.get_tools() if tool.name == name), None)
         if not tool:
             raise ValueError(f"Tool with name {name} not found")
 
-        # Log tool usage
-        logger.info(
-            f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
-        )
-
-        return await tool.run(arguments)
+        return await tool.aexecute(arguments)
 
 
 class ToolkitSuite(ABC):
