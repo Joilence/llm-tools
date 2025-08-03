@@ -114,11 +114,6 @@ class Tool(FastMCPFunctionTool):
 class Toolkit(ABC):
     """A set of tools that supposed to work together"""
 
-    def __init__(self, tools: Optional[list[Union[Tool, Callable]]] = None):
-        self._external_tools: list[Tool] = []
-        if tools:
-            self.add_tools(tools)
-
     @property
     def name(self) -> str:
         return self.__class__.__name__
@@ -181,42 +176,8 @@ class Toolkit(ABC):
         ]
 
     def get_tools(self) -> list[Tool]:
-        """Get all tools: member tools + external tools (external overrides member)"""
-        tools_dict = {tool.name: tool for tool in self._member_tools}
-        for tool in self._external_tools:
-            tools_dict[tool.name] = tool  # External tools override member tools
-        return list(tools_dict.values())
-
-    def add_tools(
-        self, tools: Union[Tool, Callable, list[Union[Tool, Callable]]]
-    ) -> None:
-        """Add external tools to the toolkit
-
-        Args:
-            tools: Tool instances or decorated functions (with @tool_def), or list of either
-        """
-        if not isinstance(tools, list):
-            tools = [tools]
-
-        for tool in tools:
-            if isinstance(tool, Tool):
-                self._external_tools.append(tool)
-            elif callable(tool) and hasattr(tool, "_tool_def"):
-                # Convert decorated function to Tool instance
-                tool_def = getattr(tool, "_tool_def")
-                tool_instance = cast(
-                    Tool,
-                    Tool.from_function(
-                        fn=tool,
-                        name=tool_def.name,
-                        description=tool_def.description,
-                    ),
-                )
-                self._external_tools.append(tool_instance)
-            else:
-                raise ValueError(
-                    f"Invalid tool: {tool}. Must be Tool instance or function decorated with @tool_def"
-                )
+        """Get all member tools decorated with @tool_def"""
+        return self._member_tools
 
     def register_mcp(self, mcp: FastMCP):
         """Register the tools in the toolkit with the given MCP instance."""
