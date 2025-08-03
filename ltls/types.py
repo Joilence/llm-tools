@@ -15,8 +15,9 @@ from typing import (
     Sequence,
 )
 from abc import ABC
-from mcp.server.fastmcp.tools import Tool as FastMCPTool
-from mcp.server.fastmcp import FastMCP
+from fastmcp.tools import FunctionTool as FastMCPFunctionTool
+from fastmcp import FastMCP
+from fastmcp.utilities.types import get_cached_typeadapter
 from enum import Enum
 import logging
 import anthropic
@@ -38,25 +39,22 @@ class ToolParamSchema(str, Enum):
 UnionToolParam = Union[OpenAIToolParam, AnthropicToolParam]
 
 
-class Tool(FastMCPTool):
+class Tool(FastMCPFunctionTool):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> anthropic.types.ToolParam:
-        ...
+    ) -> anthropic.types.ToolParam: ...
 
     @overload
-    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam:
-        ...
+    def as_param(self, mode: Literal[ToolParamSchema.OPENAI]) -> OpenAIToolParam: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> UnionToolParam:
-        ...
+    ) -> UnionToolParam: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -69,7 +67,7 @@ class Tool(FastMCPTool):
                     type="function",
                     function=FunctionDefinition(
                         name=self.name,
-                        description=self.description,
+                        description=self.description or "",
                         parameters=self.parameters,
                     ),
                 )
@@ -78,7 +76,7 @@ class Tool(FastMCPTool):
                 # Create ToolParam using Anthropic's API directly
                 return anthropic.types.ToolParam(
                     name=self.name,
-                    description=self.description,
+                    description=self.description or "",
                     input_schema=self.parameters,
                 )
             case _:
@@ -104,20 +102,17 @@ class Toolkit(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]:
-        ...
+    ) -> Sequence[anthropic.types.ToolParam]: ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]:
-        ...
+    ) -> Sequence[OpenAIToolParam]: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]:
-        ...
+    ) -> Sequence[UnionToolParam]: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
@@ -199,11 +194,7 @@ class Toolkit(ABC):
         """Register the tools in the toolkit with the given MCP instance."""
 
         for tool in self.get_tools():
-            mcp.add_tool(
-                tool.fn,
-                name=tool.name,
-                description=tool.description,
-            )
+            mcp.add_tool(tool)
 
     def create_mcp_server(self, name: Optional[str] = None, **mcp_kwargs) -> FastMCP:
         """Create and configure an MCP server with this toolkit's tools.
@@ -222,8 +213,8 @@ class Toolkit(ABC):
     def execute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments synchronously
 
-        NOTE: This function is added when tool function and application are designed to 
-        be synchronous, and avoid event loop conflicts if a sync tool function is using 
+        NOTE: This function is added when tool function and application are designed to
+        be synchronous, and avoid event loop conflicts if a sync tool function is using
         async libraries.
 
         Args:
@@ -239,7 +230,7 @@ class Toolkit(ABC):
             raise ValueError(f"Tool with name {name} not found")
 
         # Check if tool is async
-        if tool.is_async or inspect.iscoroutinefunction(tool.fn):
+        if inspect.iscoroutinefunction(tool.fn):
             raise RuntimeError(
                 f"Tool '{name}' is asynchronous and cannot be executed synchronously. "
                 "Use aexecute_tool() instead."
@@ -250,15 +241,9 @@ class Toolkit(ABC):
             f"Executing tool: {name} with arguments:\n{json.dumps(arguments, indent=2)}"
         )
 
-        # Validate arguments using the metadata synchronously
-        arguments_pre_parsed = tool.fn_metadata.pre_parse_json(arguments)
-        arguments_parsed_model = tool.fn_metadata.arg_model.model_validate(
-            arguments_pre_parsed
-        )
-        arguments_parsed_dict = arguments_parsed_model.model_dump_one_level()
-
-        # Call the function directly (synchronously)
-        return tool.fn(**arguments_parsed_dict)
+        type_adapter = get_cached_typeadapter(tool.fn)
+        result = type_adapter.validate_python(arguments)
+        return result
 
     async def aexecute_tool(self, name: str, arguments: dict[str, Any]):
         """Execute the tool with the given name and arguments (asynchronous version)"""
@@ -294,20 +279,17 @@ class ToolkitSuite(ABC):
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.ANTHROPIC]
-    ) -> Sequence[anthropic.types.ToolParam]:
-        ...
+    ) -> Sequence[anthropic.types.ToolParam]: ...
 
     @overload
     def as_param(
         self, mode: Literal[ToolParamSchema.OPENAI]
-    ) -> Sequence[OpenAIToolParam]:
-        ...
+    ) -> Sequence[OpenAIToolParam]: ...
 
     @overload
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI
-    ) -> Sequence[UnionToolParam]:
-        ...
+    ) -> Sequence[UnionToolParam]: ...
 
     def as_param(
         self, mode: ToolParamSchema = ToolParamSchema.OPENAI

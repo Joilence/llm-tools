@@ -26,7 +26,7 @@ def cli(debug: bool):
 @cli.command()
 def mcp():
     """Start ltls as an MCP server with all available tools"""
-    from mcp.server.fastmcp import FastMCP
+    from fastmcp import FastMCP
 
     tool_suite = ToolkitSuite(toolkits=[])
 
