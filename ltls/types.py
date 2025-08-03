@@ -26,8 +26,17 @@ from openai.types.chat.chat_completion_tool_param import (
 )
 from openai.types.shared_params import FunctionDefinition
 from anthropic.types.tool_param import ToolParam as AnthropicToolParam
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+class ToolResult(BaseModel):
+    success: bool = Field(description="Indicates if the operation was successful")
+    result: Any = Field(description="The result of the operation")
+    comments: list[str | dict] | None = Field(
+        default=None, description="Additional information about the result"
+    )
 
 
 class ToolParamSchema(str, Enum):
