@@ -8,9 +8,6 @@ import pytest
 class TestToolkit(ltls.Toolkit):
     """A simple toolkit for testing."""
 
-    def __init__(self, tools=None):
-        super().__init__(tools)
-
     @ltls.tool_def(name="tool_with_params")
     def tool_with_params(
         self,
@@ -49,18 +46,6 @@ def external_tool_function(
 @pytest.fixture
 def test_toolkit():
     return TestToolkit()
-
-
-@pytest.fixture
-def test_toolkit_with_external_tools():
-    toolkit = TestToolkit()
-    toolkit.add_tools(external_tool_function)  # Direct function usage!
-    return toolkit
-
-
-@pytest.fixture
-def test_toolkit_constructor_with_external():
-    return TestToolkit(tools=[external_tool_function])  # Direct function usage!
 
 
 if __name__ == "__main__":
