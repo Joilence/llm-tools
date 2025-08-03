@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 class ToolParamSchema(str, Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
-    MCP = "mcp"
 
 
 UnionToolParam = Union[OpenAIToolParam, AnthropicToolParam]
