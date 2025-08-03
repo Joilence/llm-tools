@@ -67,9 +67,9 @@ def test_litellm_models_tool_compatibility(model_id, toolkit):
         response_text = response.choices[0].message.content or ""
 
         # Check if the response mentions tools
-        assert (
-            len(response_text) > 0
-        ), f"Model {model_id} did not return a valid response"
+        assert len(response_text) > 0, (
+            f"Model {model_id} did not return a valid response"
+        )
 
         # Try to look for at least one of our tool names in the response
         tool_names = ["echo", "add", "search"]

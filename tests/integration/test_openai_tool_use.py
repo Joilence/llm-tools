@@ -44,9 +44,9 @@ def test_openai_models_tool_compatibility(model_id, toolkit):
 
         # Check if the response mentions tools
         # Not all models consistently mention tools by name, so we check for any tool response
-        assert (
-            len(response_text) > 0
-        ), f"Model {model_id} did not return a valid response"
+        assert len(response_text) > 0, (
+            f"Model {model_id} did not return a valid response"
+        )
 
         # Try to look for at least one of our tool names in the response
         tool_names = ["echo", "add", "search"]
