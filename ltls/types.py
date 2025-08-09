@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class ToolResult(BaseModel):
     success: bool = Field(description="Indicates if the operation was successful")
     result: Any = Field(description="The result of the operation")
-    comments: list[str | dict] | None = Field(
+    comments: list[str] | list[dict] | list[str | dict] | None = Field(
         default=None, description="Additional information about the result"
     )
 
