@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "test-fastmcp": {
+      "command": "uv",
+      "args": ["run", "python", "tests/test_fastmcp.py"]
+    }
+  }
+}
