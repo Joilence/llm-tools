@@ -3,6 +3,10 @@
     "test-fastmcp": {
       "command": "uv",
       "args": ["run", "python", "tests/test_fastmcp.py"]
+    },
+    "test-fastmcp-toolkitsuite": {
+      "command": "uv",
+      "args": ["run", "python", "tests/test_fastmcp_toolkitsuite.py"]
     }
   }
 }

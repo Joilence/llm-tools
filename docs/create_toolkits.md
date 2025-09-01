@@ -420,3 +420,7 @@ param1: Annotated[BaseModel | str, Field(description="A required base model para
 ### AWS Related
 
 - [AWS MCP Lambda Handler: Add support for pydantic data classes](https://github.com/awslabs/mcp/issues/684)
+
+## Appendix: Fix Attempt
+
+Attempted to fix the issue by overriding `fastmcp.tools.FunctionTool.run` to use `json.loads` to parse the string to the `BaseModel` if the parameter is a string, but validation issue persists before reaching this point. We must also patch tool parameter schema passed to Claude Code where `BaseModel` exists as a parameter to add `anyOf` to accept string or object, but this is essentially the same as the workaround mentioned above, so not implemented.
